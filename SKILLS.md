@@ -1,126 +1,213 @@
 ---
 name: minions-orchestration
-description: Agent skills for working with Minions Orchestration MinionTypes. Provides CRUD operations, CLI usage, and best practices for AI agents managing minions-orchestration data.
+description: Clawspace registry, toolbox-to-agent mappings, and fleet configuration
 ---
 
-# Minions Orchestration Agent Skills
+# minions-orchestration — Agent Skills
 
-Skills for agents operating on the `minions-orchestration` toolbox.
+## What is Orchestration in the Minions Context?
 
-## Prerequisites
+Before defining types, it's worth being precise. "Orchestration" can mean several different things:
 
-Install the SDK and CLI:
+```
+the registry of all clawspaces                → Clawspace
+the mapping of toolboxes to agents            → ToolboxRegistration
+the fleet composition for a clawspace         → AgentFleetConfig
+the act of coordinating agent execution       → handled by OrchestratorAgent + minions-workflows
+```
+
+---
+
+## MinionTypes
+
+**Core**
+```ts
+// clawspace
+{
+  type: "clawspace",
+  fields: {
+    name: string,                    // "OpportunityHunter", "WiesnTracker", etc.
+    description: string,
+    status: "active" | "paused" | "archived",
+    toolboxIds: string[],            // all toolbox ids in this clawspace
+    agentIds: string[],              // all agent ids in this clawspace
+    orchestratorAgentId: string,     // the orchestrator for this clawspace
+    createdAt: datetime
+  }
+}
+
+// toolbox-registration
+{
+  type: "toolbox-registration",
+  fields: {
+    toolboxId: string,
+    toolboxName: string,             // "minions-jobs", "minions-tasks", etc.
+    agentId: string,                 // the agent that owns this toolbox
+    agentName: string,
+    role: "owner" | "reader" | "shared",
+    clawspaceId: string,
+    registeredAt: datetime
+  }
+}
+
+// agent-fleet-config
+{
+  type: "agent-fleet-config",
+  fields: {
+    clawspaceId: string,
+    orchestratorAgentId: string,
+    workerAgentIds: string[],
+    sharedToolboxIds: string[],      // toolboxes available to all agents
+    status: "active" | "paused",
+    lastUpdatedAt: datetime
+  }
+}
+```
+
+---
+
+## Relations
+
+```
+clawspace              --contains-->          toolbox-registration
+clawspace              --governed_by-->        agent-fleet-config
+toolbox-registration   --maps-->              agent-definition (minions-agents)
+agent-fleet-config     --references-->        agent-definition (minions-agents)
+agent-fleet-config     --includes-->          toolbox (any toolbox)
+```
+
+---
+
+## How It Connects to Other Toolboxes
+
+`minions-orchestration` is the meta-layer — it knows about everything but owns nothing domain-specific:
+
+```
+minions-agents         → agent-fleet-config references agent-definitions by id
+minions-workflows      → workflow-definitions are scoped to a clawspaceId
+minions-tasks          → clawspace health checks may spawn tasks
+minions-comms          → clawspace status changes trigger notifications
+minions-approvals      → pausing or archiving a clawspace may require approval
+```
+
+The key design rule: **orchestration is about composition, not execution**. It registers what exists and how it's wired. Actual execution flows through `minions-workflows`.
+
+---
+
+## Agent SKILLS for `minions-orchestration`
+
+```markdown
+# OrchestrationAgent Skills
+
+## Context
+You manage the clawspace registry and fleet composition. You know which
+toolboxes exist, which agents own them, and how each clawspace is wired.
+You do not execute domain logic — you maintain the map.
+
+## Skill: Register Clawspace
+1. Create a `clawspace` Minion with name, description, status "active"
+2. For each toolbox in the clawspace, create a `toolbox-registration` Minion
+3. Create an `agent-fleet-config` Minion with orchestrator and worker agent ids
+4. Emit "clawspace-registered" to all relevant agents
+
+## Skill: Update Fleet Composition
+1. On receiving "add-agent" or "remove-agent" instruction:
+   - Update the `agent-fleet-config` workerAgentIds
+   - Create or archive the relevant `toolbox-registration`
+2. Log the change as a task-history-entry in minions-tasks
+
+## Skill: Health Check
+1. On schedule: iterate all active clawspaces
+2. For each: verify all registered agents are healthy (via minions-agents)
+3. If any agent is degraded or unresponsive:
+   - Flag the clawspace status
+   - Notify via minions-comms
+   - Create a task in minions-tasks to investigate
+
+## Skill: Archive Clawspace
+1. Set clawspace status to "archived"
+2. Set agent-fleet-config status to "paused"
+3. Do not delete any data — only change status
+4. Require approval via minions-approvals before archiving
+
+## Hard Rules
+- Never delete a clawspace — only archive
+- Every toolbox must have exactly one owning agent via toolbox-registration
+- Fleet config changes always require logging
+- Shared toolbox registrations use role: "shared"
+```
+
+
+---
+
+## CLI Reference
+
+Install globally:
 
 ```bash
-# TypeScript
-pnpm add @minions-orchestration/sdk
-
-# Python
-pip install minions-orchestration
-
-# CLI
 pnpm add -g @minions-orchestration/cli
 ```
 
----
+Set `MINIONS_STORE` env var to control where data is stored (default: `.minions/`).
+Storage uses sharded directories: `.minions/<id[0..1]>/<id[2..3]>/<id>.json`
 
-## Using the CLI
-
-The `orchestration` CLI provides basic project info and utilities:
+### Discover Types
 
 ```bash
-# Show project info (SDK name, CLI name, Python package)
-orchestration info
+# List all MinionTypes with their fields
+orchestration types list
+
+# Show detailed schema for a specific type
+orchestration types show <type-slug>
 ```
 
-Use the CLI as the primary interface for scripted operations. For programmatic access within agent code, use the SDK directly.
+### Create
 
----
+```bash
+# Create with shortcut flags
+orchestration create <type> -t "Title" -s "status" -p "priority"
 
-## Using the SDK
-
-### TypeScript
-
-```ts
-import { customTypes } from '@minions-orchestration/sdk/schemas';
-
-// List all available MinionTypes in this toolbox
-for (const type of customTypes) {
-  console.log(`${type.icon} ${type.name} (${type.slug})`);
-  console.log(`  ${type.description}`);
-  console.log(`  Fields: ${type.schema.map(f => f.name).join(', ')}`);
-}
-
-// Access a specific type
-const myType = customTypes.find(t => t.slug === 'YOUR_TYPE_SLUG');
+# Create with full field data
+orchestration create <type> --data '{ ... }'
 ```
 
-### Python
+### Read
 
-```python
-from minions_orchestration.schemas import custom_types
+```bash
+# List all Minions of a type
+orchestration list <type>
 
-# List all available MinionTypes
-for t in custom_types:
-    print(f"{t.icon} {t.name} ({t.slug})")
-    print(f"  {t.description}")
+# Show a specific Minion
+orchestration show <id>
+
+# Search by text
+orchestration search "query"
+
+# Output as JSON (for piping)
+orchestration list --json
+orchestration show <id> --json
 ```
 
----
+### Update
 
-## Skill: Create Minion
+```bash
+# Update fields
+orchestration update <id> --data '{ "status": "active" }'
+```
 
-When creating a new Minion of any type in this toolbox:
+### Delete
 
-1. Look up the MinionType from `customTypes` by slug
-2. Validate all required fields are present according to the schema
-3. Set `string` fields to their values, `number` fields to numeric values
-4. Set `select` fields to one of their valid options
-5. Set `boolean` fields to `true` or `false`
-6. Always include a timestamp for any `createdAt` or similar fields (ISO 8601 format)
+```bash
+# Soft-delete (marks as deleted, preserves data)
+orchestration delete <id>
+```
 
----
+### Stats & Validation
 
-## Skill: Read / Query Minions
+```bash
+# Show storage stats
+orchestration stats
 
-When reading or searching for Minions:
-
-1. Query by MinionType slug to filter by type
-2. Use field values for secondary filtering
-3. For references (fields ending in `Id`), resolve the linked Minion for full context
-4. Return results in a structured format the calling agent can parse
-
----
-
-## Skill: Update Minion
-
-When updating an existing Minion:
-
-1. Load the current Minion by ID
-2. Validate the update against the MinionType schema
-3. Only modify the fields that need changing — preserve existing values
-4. If the type has a `status` field, follow valid status transitions
-5. If the type has an `updatedAt` field, set it to the current timestamp
-6. Log significant field changes for audit if the context requires it
-
----
-
-## Skill: Delete / Archive Minion
-
-When removing a Minion:
-
-1. Prefer soft-delete: set `status` to `"cancelled"` or `"archived"` if available
-2. Never hard-delete Minions that other Minions reference via ID fields
-3. Check for dependent Minions before any destructive operation
-4. If hard-delete is required, ensure all references are cleaned up first
-
----
-
-## Hard Rules
-
-- Every Minion MUST conform to its MinionType schema
-- All `select` fields must use valid option values
-- All ID reference fields must point to existing Minions
-- Timestamps must be in ISO 8601 format
-- Never create orphaned Minions — always set reference fields when applicable
-- This agent only writes to `minions-orchestration` — it reads from other toolboxes but never writes to them
+# Validate a Minion JSON file against its schema
+orchestration validate ./my-minion.json
+```
