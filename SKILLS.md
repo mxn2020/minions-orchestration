@@ -1,6 +1,12 @@
 ---
 name: minions-orchestration
-description: Clawspace registry, toolbox-to-agent mappings, and fleet configuration
+id: OC-0133
+version: 1.0.0
+description: "Clawspace registry, toolbox-to-agent mappings, and fleet configuration"
+category: ai
+subcategory: general
+tags: ["minion", "ai", "general"]
+comments:
 ---
 
 # minions-orchestration — Agent Skills
