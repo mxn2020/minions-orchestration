@@ -149,65 +149,28 @@ pnpm add -g @minions-orchestration/cli
 ```
 
 Set `MINIONS_STORE` env var to control where data is stored (default: `.minions/`).
-Storage uses sharded directories: `.minions/<id[0..1]>/<id[2..3]>/<id>.json`
 
 ### Discover Types
 
 ```bash
-# List all MinionTypes with their fields
 orchestration types list
-
-# Show detailed schema for a specific type
 orchestration types show <type-slug>
 ```
 
-### Create
+### CRUD
 
 ```bash
-# Create with shortcut flags
-orchestration create <type> -t "Title" -s "status" -p "priority"
-
-# Create with full field data
-orchestration create <type> --data '{ ... }'
-```
-
-### Read
-
-```bash
-# List all Minions of a type
+orchestration create <type> -t "Title" -s "status"
 orchestration list <type>
-
-# Show a specific Minion
 orchestration show <id>
-
-# Search by text
-orchestration search "query"
-
-# Output as JSON (for piping)
-orchestration list --json
-orchestration show <id> --json
-```
-
-### Update
-
-```bash
-# Update fields
 orchestration update <id> --data '{ "status": "active" }'
-```
-
-### Delete
-
-```bash
-# Soft-delete (marks as deleted, preserves data)
 orchestration delete <id>
+orchestration search "query"
 ```
 
 ### Stats & Validation
 
 ```bash
-# Show storage stats
 orchestration stats
-
-# Validate a Minion JSON file against its schema
 orchestration validate ./my-minion.json
 ```
