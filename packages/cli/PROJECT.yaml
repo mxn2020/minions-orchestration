@@ -1,0 +1,8 @@
+name: "@minions-orchestration/cli"
+project_scope: child
+child_type: cli
+parent_project: minions-orchestration-workspace
+description: "CLI for minions-orchestration — Clawspace registry, toolbox-to-agent mappings, and fleet configuration"
+priority: high
+deploy_url: null
+tags: null

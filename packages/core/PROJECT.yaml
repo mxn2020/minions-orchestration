@@ -1,0 +1,8 @@
+name: "@minions-orchestration/sdk"
+project_scope: child
+child_type: sdk
+parent_project: minions-orchestration-workspace
+description: "Clawspace registry, toolbox-to-agent mappings, and fleet configuration"
+priority: high
+deploy_url: null
+tags: null
