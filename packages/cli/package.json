@@ -1,6 +1,6 @@
 {
   "name": "@minions-orchestration/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "CLI for minions-orchestration — Clawspace registry, toolbox-to-agent mappings, and fleet configuration",
   "license": "MIT",
   "repository": {

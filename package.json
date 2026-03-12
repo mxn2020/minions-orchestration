@@ -1,7 +1,7 @@
 {
   "name": "minions-orchestration-workspace",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Clawspace registry, toolbox-to-agent mappings, and fleet configuration",
   "type": "module",
   "license": "MIT",
